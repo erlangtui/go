@@ -17,6 +17,8 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"golang.org/x/net/http/httpguts"
+	"golang.org/x/net/http/httpproxy"
 	"internal/godebug"
 	"io"
 	"log"
@@ -31,9 +33,6 @@ import (
 	"sync/atomic"
 	"time"
 	_ "unsafe"
-
-	"golang.org/x/net/http/httpguts"
-	"golang.org/x/net/http/httpproxy"
 )
 
 // DefaultTransport is the default implementation of [Transport] and is
@@ -499,9 +498,7 @@ func (t *Transport) useRegisteredProtocol(req *Request) bool {
 	return true
 }
 
-// alternateRoundTripper returns the alternate RoundTripper to use
-// for this request if the Request's URL scheme requires one,
-// or nil for the normal case of using the Transport.
+// alternateRoundTripper 返回用于此请求的备用 RoundTripper（如果请求的 URL 协议需要一个），或者在使用 Transport 的正常情况下返回 nil。
 func (t *Transport) alternateRoundTripper(req *Request) RoundTripper {
 	if !t.useRegisteredProtocol(req) {
 		return nil

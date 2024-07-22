@@ -14,6 +14,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"golang.org/x/net/http/httpguts"
+	"golang.org/x/net/idna"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -26,9 +28,6 @@ import (
 	"strings"
 	"sync"
 	_ "unsafe" // for linkname
-
-	"golang.org/x/net/http/httpguts"
-	"golang.org/x/net/idna"
 )
 
 const (
@@ -103,44 +102,25 @@ var reqWriteExcludeHeader = map[string]bool{
 	"Trailer":           true,
 }
 
-// A Request represents an HTTP request received by a server
-// or to be sent by a client.
-//
-// The field semantics differ slightly between client and server
-// usage. In addition to the notes on the fields below, see the
-// documentation for [Request.Write] and [RoundTripper].
+// Request 表示服务器接收的或客户端发送的 HTTP 请求。客户端和服务器使用情况之间的字段语义略有不同。除了有关以下字段的注释外，请参阅 [Request.Write] 和 [RoundTripper] 的文档。
 type Request struct {
-	// Method specifies the HTTP method (GET, POST, PUT, etc.).
-	// For client requests, an empty string means GET.
+	// Method 指定 HTTP 方法（GET、POST、PUT 等）。对于客户端请求，空字符串表示 GET。
 	Method string
 
-	// URL specifies either the URI being requested (for server
-	// requests) or the URL to access (for client requests).
-	//
-	// For server requests, the URL is parsed from the URI
-	// supplied on the Request-Line as stored in RequestURI.  For
-	// most requests, fields other than Path and RawQuery will be
-	// empty. (See RFC 7230, Section 5.3)
-	//
-	// For client requests, the URL's Host specifies the server to
-	// connect to, while the Request's Host field optionally
-	// specifies the Host header value to send in the HTTP
-	// request.
+	// URL 指定要请求的 URI（用于服务器请求）或要访问的 URL（用于客户端请求）。
+	// 对于服务器请求，URL 是从 Request-Line 上提供的 URI 中解析的，该 URI 存储在 RequestURI 中。
+	// 对于大多数请求，除 Path 和 RawQuery 之外的字段将为空。
+	// （请参阅 RFC 7230 的第 5.3 节）对于客户端请求，URL 的 Host 指定要连接到的服务器，而 Request's Host 字段可以选择指定要在 HTTP 请求中发送的 Host 标头值。
 	URL *url.URL
 
-	// The protocol version for incoming server requests.
-	//
-	// For client requests, these fields are ignored. The HTTP
-	// client code always uses either HTTP/1.1 or HTTP/2.
-	// See the docs on Transport for details.
+	// 传入服务器请求的协议版本。对于客户端请求，这些字段将被忽略。
+	// HTTP 客户端代码始终使用 HTTP1.1 或 HTTP2。有关详细信息，请参阅有关传输的文档。
 	Proto      string // "HTTP/1.0"
 	ProtoMajor int    // 1
 	ProtoMinor int    // 0
 
-	// Header contains the request header fields either received
-	// by the server or to be sent by the client.
-	//
-	// If a server received a request with header lines,
+	// Header 包含服务器接收或客户端发送的请求头字段。
+	// 如果服务器收到带有标题行的请求，
 	//
 	//	Host: example.com
 	//	accept-encoding: gzip, deflate
@@ -156,51 +136,26 @@ type Request struct {
 	//		"Foo": {"Bar", "two"},
 	//	}
 	//
-	// For incoming requests, the Host header is promoted to the
-	// Request.Host field and removed from the Header map.
-	//
-	// HTTP defines that header names are case-insensitive. The
-	// request parser implements this by using CanonicalHeaderKey,
-	// making the first character and any characters following a
-	// hyphen uppercase and the rest lowercase.
-	//
-	// For client requests, certain headers such as Content-Length
-	// and Connection are automatically written when needed and
-	// values in Header may be ignored. See the documentation
-	// for the Request.Write method.
+	// 对于传入的请求，Host 标头将提升为 Request.Host 字段，并从 Header 映射中删除。
+	// HTTP 定义标头名称不区分大小写。请求分析器通过使用 CanonicalHeaderKey 来实现此目的，使第一个字符和任何字符后面的连字符为大写，其余字符为小写。
+	// 对于客户端请求，某些标头（如 Content-Length 和 Connection）会在需要时自动写入，并且 Header 中的值可能会被忽略。
+	// 请参阅 Request.Write 方法的文档。
 	Header Header
 
-	// Body is the request's body.
-	//
-	// For client requests, a nil body means the request has no
-	// body, such as a GET request. The HTTP Client's Transport
-	// is responsible for calling the Close method.
-	//
-	// For server requests, the Request Body is always non-nil
-	// but will return EOF immediately when no body is present.
-	// The Server will close the request body. The ServeHTTP
-	// Handler does not need to.
-	//
-	// Body must allow Read to be called concurrently with Close.
-	// In particular, calling Close should unblock a Read waiting
-	// for input.
+	// Body 是请求体，对于客户端的请求，nil body 意味着没有请求体，例如 get 请求。
+	// http 客户端 Transport 负责调用 Body 的 close 方法。
+	// 对于服务端请求，请求体始终为非 nil，但在不存在正文时将立即返回 EOF。
+	// 服务端将关闭请求体。ServeHTTP 处理程序不需要关闭。
+	// 正文必须允许 Read 与 Close 同时调用。具体而言，调用 Close 应取消阻塞正在等待输入的 Read。
 	Body io.ReadCloser
 
-	// GetBody defines an optional func to return a new copy of
-	// Body. It is used for client requests when a redirect requires
-	// reading the body more than once. Use of GetBody still
-	// requires setting Body.
-	//
-	// For server requests, it is unused.
+	// GetBody 定义了一个可选的 func 来返回 Body 的新副本。
+	// 它用于当重定向需要多次读取 body 时的客户端请求。
+	// 使用 GetBody 仍需要设置 Body。对于服务器请求，它是未使用的。
 	GetBody func() (io.ReadCloser, error)
 
-	// ContentLength records the length of the associated content.
-	// The value -1 indicates that the length is unknown.
-	// Values >= 0 indicate that the given number of bytes may
-	// be read from Body.
-	//
-	// For client requests, a value of 0 with a non-nil Body is
-	// also treated as unknown.
+	// ContentLength 记录关联内容的长度。值 -1 表示长度未知。值 >= 0 表示可以从 Body 读取给定的字节数。
+	// 对于客户端请求，值为 0 且非 nil Body 也被视为未知。
 	ContentLength int64
 
 	// TransferEncoding lists the transfer encodings from outermost to
@@ -316,9 +271,7 @@ type Request struct {
 	// set, it is undefined whether Cancel is respected.
 	Cancel <-chan struct{}
 
-	// Response is the redirect response which caused this request
-	// to be created. This field is only populated during client
-	// redirects.
+	// Response 是导致创建此请求的重定向响应。此字段仅在客户端重定向期间填充。
 	Response *Response
 
 	// Pattern is the [ServeMux] pattern that matched the request.
@@ -1558,6 +1511,7 @@ func (r *Request) isReplayable() bool {
 
 // outgoingLength reports the Content-Length of this outgoing (Client) request.
 // It maps 0 into -1 (unknown) when the Body is non-nil.
+// outgoingLength 报告此 （Client） 传出请求的 Content-Length。
 func (r *Request) outgoingLength() int64 {
 	if r.Body == nil || r.Body == NoBody {
 		return 0

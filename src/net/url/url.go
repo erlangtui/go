@@ -5,10 +5,9 @@
 // Package url parses URLs and implements query escaping.
 package url
 
-// See RFC 3986. This package generally follows RFC 3986, except where
-// it deviates for compatibility reasons. When sending changes, first
-// search old issues for history on decisions. Unit tests should also
-// contain references to issue numbers with details.
+// 请参阅 RFC 3986。此包通常遵循 RFC 3986，除非出于兼容性原因而偏离。
+// 发送更改时，首先搜索旧问题以获取有关决策的历史记录。
+// 单元测试还应包含对问题编号的引用以及详细信息。
 
 import (
 	"errors"
@@ -20,7 +19,7 @@ import (
 	_ "unsafe" // for linkname
 )
 
-// Error reports an error and the operation and URL that caused it.
+// Error 报告错误以及导致该错误的操作和 URL。
 type Error struct {
 	Op  string
 	URL string
@@ -46,6 +45,7 @@ func (e *Error) Temporary() bool {
 
 const upperhex = "0123456789ABCDEF"
 
+// 是否是 16 进制
 func ishex(c byte) bool {
 	switch {
 	case '0' <= c && c <= '9':
@@ -181,6 +181,8 @@ func shouldEscape(c byte, mode encoding) bool {
 // hex-decoded byte 0xAB.
 // It returns an error if any % is not followed by two hexadecimal
 // digits.
+// QueryUnescape 执行 [QueryEscape] 的反向转换，将格式为“%AB”的每个 3 字节编码子字符串转换为十六进制解码的字节0xAB。
+// 如果任何 % 后面没有跟两个十六进制数字，则返回错误。
 func QueryUnescape(s string) (string, error) {
 	return unescape(s, encodeQueryComponent)
 }
