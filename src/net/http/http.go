@@ -7,13 +7,12 @@
 package http
 
 import (
+	"golang.org/x/net/http/httpguts"
 	"io"
 	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
-
-	"golang.org/x/net/http/httpguts"
 )
 
 // incomparable is a zero-width, non-comparable type. Adding it to a struct
@@ -107,6 +106,8 @@ func hexEscapeNonASCII(s string) string {
 // and Close always returns nil. It can be used in an outgoing client
 // request to explicitly signal that a request has zero bytes.
 // An alternative, however, is to simply set [Request.Body] to nil.
+// NoBody 是 [io.ReadCloser] 没有字节。Read 始终返回 EOF，Close 始终返回 nil。
+// 它可以在传出客户端请求中使用，以明确表示请求具有零字节。但是，另一种方法是简单地将 [Request.Body] 设置为 nil。
 var NoBody = noBody{}
 
 type noBody struct{}

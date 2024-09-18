@@ -29,6 +29,7 @@ type Error struct {
 func (e *Error) Unwrap() error { return e.Err }
 func (e *Error) Error() string { return fmt.Sprintf("%s %q: %s", e.Op, e.URL, e.Err) }
 
+// Timeout 是否是超时错误
 func (e *Error) Timeout() bool {
 	t, ok := e.Err.(interface {
 		Timeout() bool
@@ -36,6 +37,7 @@ func (e *Error) Timeout() bool {
 	return ok && t.Timeout()
 }
 
+// Temporary 是否是临时错误
 func (e *Error) Temporary() bool {
 	t, ok := e.Err.(interface {
 		Temporary() bool
@@ -58,6 +60,7 @@ func ishex(c byte) bool {
 	return false
 }
 
+// 将一个十六进制字符转换成其对应的十进制数值
 func unhex(c byte) byte {
 	switch {
 	case '0' <= c && c <= '9':
@@ -94,11 +97,8 @@ func (e InvalidHostError) Error() string {
 	return "invalid character " + strconv.Quote(string(e)) + " in host name"
 }
 
-// Return true if the specified character should be escaped when
-// appearing in a URL string, according to RFC 3986.
-//
-// Please be informed that for now shouldEscape does not check all
-// reserved characters correctly. See golang.org/issue/5684.
+// 根据 RFC 3986，如果指定的字符在出现在 URL 字符串中时应进行转义，则返回 true。
+// 请注意，目前 shouldEscape 不会正确检查所有保留字符。见golang.orgissue5684。
 func shouldEscape(c byte, mode encoding) bool {
 	// §2.3 Unreserved characters (alphanum)
 	if 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || '0' <= c && c <= '9' {
@@ -176,30 +176,20 @@ func shouldEscape(c byte, mode encoding) bool {
 	return true
 }
 
-// QueryUnescape does the inverse transformation of [QueryEscape],
-// converting each 3-byte encoded substring of the form "%AB" into the
-// hex-decoded byte 0xAB.
-// It returns an error if any % is not followed by two hexadecimal
-// digits.
 // QueryUnescape 执行 [QueryEscape] 的反向转换，将格式为“%AB”的每个 3 字节编码子字符串转换为十六进制解码的字节0xAB。
 // 如果任何 % 后面没有跟两个十六进制数字，则返回错误。
 func QueryUnescape(s string) (string, error) {
 	return unescape(s, encodeQueryComponent)
 }
 
-// PathUnescape does the inverse transformation of [PathEscape],
-// converting each 3-byte encoded substring of the form "%AB" into the
-// hex-decoded byte 0xAB. It returns an error if any % is not followed
-// by two hexadecimal digits.
-//
-// PathUnescape is identical to [QueryUnescape] except that it does not
-// unescape '+' to ' ' (space).
+// PathUnescape 执行 [PathEscape] 的反向转换，将格式为“%AB”的每个 3 字节编码子字符串转换为十六进制解码的字节0xAB。
+// 如果任何 % 后面没有跟两个十六进制数字，则返回错误。
+// PathUnescape 与 [QueryUnescape] 相同，只是它不会将“+”取消转义为 “”（空格）。
 func PathUnescape(s string) (string, error) {
 	return unescape(s, encodePathSegment)
 }
 
-// unescape unescapes a string; the mode specifies
-// which section of the URL string is being unescaped.
+// unescape：取消字符串转义，该模式指定取消转义的 URL 字符串的哪个部分。
 func unescape(s string, mode encoding) (string, error) {
 	// Count %, check that they're well-formed.
 	n := 0
@@ -273,14 +263,12 @@ func unescape(s string, mode encoding) (string, error) {
 	return t.String(), nil
 }
 
-// QueryEscape escapes the string so it can be safely placed
-// inside a [URL] query.
+// QueryEscape 对字符串进行转义，以便可以安全地将其放置在 [URL] 查询中。
 func QueryEscape(s string) string {
 	return escape(s, encodeQueryComponent)
 }
 
-// PathEscape escapes the string so it can be safely placed inside a [URL] path segment,
-// replacing special characters (including /) with %XX sequences as needed.
+// PathEscape 对字符串进行转义，以便可以将其安全地放置在 [URL] 路径段中，并根据需要将特殊字符（包括 /）替换为 %XX 序列。
 func PathEscape(s string) string {
 	return escape(s, encodePathSegment)
 }
@@ -341,77 +329,57 @@ func escape(s string, mode encoding) string {
 	return string(t)
 }
 
-// A URL represents a parsed URL (technically, a URI reference).
-//
-// The general form represented is:
+// URL 表示已解析的 URL（从技术上讲，是 URI 引用）。所代表的一般形式是：
 //
 //	[scheme:][//[userinfo@]host][/]path[?query][#fragment]
 //
-// URLs that do not start with a slash after the scheme are interpreted as:
+// scheme 后不以斜杠开头的 URL 被解释为：
 //
 //	scheme:opaque[?query][#fragment]
 //
-// The Host field contains the host and port subcomponents of the URL.
-// When the port is present, it is separated from the host with a colon.
-// When the host is an IPv6 address, it must be enclosed in square brackets:
-// "[fe80::1]:80". The [net.JoinHostPort] function combines a host and port
-// into a string suitable for the Host field, adding square brackets to
-// the host when necessary.
+// Host 字段包含 URL 的主机和端口子组件。当端口存在时，它用冒号与主机分隔。
+// 当主机是 IPv6 地址时，必须将其括在方括号中："[fe80::1]:80"。
+// [net.JoinHostPort] 函数将主机和端口组合成一个适合 Host 字段的字符串，并在必要时向主机添加方括号。
 //
-// Note that the Path field is stored in decoded form: /%47%6f%2f becomes /Go/.
-// A consequence is that it is impossible to tell which slashes in the Path were
-// slashes in the raw URL and which were %2f. This distinction is rarely important,
-// but when it is, the code should use the [URL.EscapedPath] method, which preserves
-// the original encoding of Path.
+// 请注意，Path 字段以解码形式存储：%47%6f%2f 变为 Go。结果是无法分辨 Path 中哪些斜杠是原始 URL 中的斜杠，哪些是 %2f。
+// 这种区别不怎么重要，但当它很重要时，代码应使用 [URL.EscapedPath] 方法，保留 Path 的原始编码。
 //
-// The RawPath field is an optional field which is only set when the default
-// encoding of Path is different from the escaped path. See the EscapedPath method
-// for more details.
-//
-// URL's String method uses the EscapedPath method to obtain the path.
+// RawPath 字段是一个可选字段，仅当 Path 的默认编码与转义路径不同时才设置。有关详细信息，请参阅 EscapedPath 方法。
+// URL 的 String 方法使用 EscapedPath 方法来获取路径。
 type URL struct {
 	Scheme      string
-	Opaque      string    // encoded opaque data
-	User        *Userinfo // username and password information
+	Opaque      string    // 编码的不透明数据
+	User        *Userinfo // 用户名和密码信息
 	Host        string    // host or host:port (see Hostname and Port methods)
-	Path        string    // path (relative paths may omit leading slash)
-	RawPath     string    // encoded path hint (see EscapedPath method)
-	OmitHost    bool      // do not emit empty host (authority)
-	ForceQuery  bool      // append a query ('?') even if RawQuery is empty
-	RawQuery    string    // encoded query values, without '?'
-	Fragment    string    // fragment for references, without '#'
-	RawFragment string    // encoded fragment hint (see EscapedFragment method)
+	Path        string    // 路径（相对路径可以省略前导斜杠）
+	RawPath     string    // 编码路径提示（请参阅 EscapedPath 方法）
+	OmitHost    bool      // 不发出空 host（权限）
+	ForceQuery  bool      // 即使 RawQuery 为空，也要追加查询 （'?'）
+	RawQuery    string    // 编码的原始请求值，不带 '?'
+	Fragment    string    // 引用片段，不带 '#'
+	RawFragment string    // 编码片段提示（请参阅 EscapedFragment 方法）
 }
 
-// User returns a [Userinfo] containing the provided username
-// and no password set.
+// User 用户返回一个 [Userinfo]，其中包含提供的用户名，但未设置密码。
 func User(username string) *Userinfo {
 	return &Userinfo{username, "", false}
 }
 
-// UserPassword returns a [Userinfo] containing the provided username
-// and password.
-//
-// This functionality should only be used with legacy web sites.
-// RFC 2396 warns that interpreting Userinfo this way
-// “is NOT RECOMMENDED, because the passing of authentication
-// information in clear text (such as URI) has proven to be a
-// security risk in almost every case where it has been used.”
+// UserPassword 返回一个 [Userinfo]，其中包含提供的用户名和密码。
+// 此功能只能用于旧版网站。RFC 2396 警告说，“不建议以这种方式解释 Userinfo，因为事实证明，在几乎所有使用过的情况下，以明文（如 URI）形式传递身份验证信息都存在安全风险。
 func UserPassword(username, password string) *Userinfo {
 	return &Userinfo{username, password, true}
 }
 
-// The Userinfo type is an immutable encapsulation of username and
-// password details for a [URL]. An existing Userinfo value is guaranteed
-// to have a username set (potentially empty, as allowed by RFC 2396),
-// and optionally a password.
+// Userinfo 类型是 [URL] 的用户名和密码详细信息的不可变封装。
+// 保证现有的 Userinfo 值设置了用户名（可能为空，如果 RFC 2396 允许），并且可以选择性地设置密码。
 type Userinfo struct {
 	username    string
 	password    string
 	passwordSet bool
 }
 
-// Username returns the username.
+// Username 返回用户名
 func (u *Userinfo) Username() string {
 	if u == nil {
 		return ""
@@ -419,7 +387,7 @@ func (u *Userinfo) Username() string {
 	return u.username
 }
 
-// Password returns the password in case it is set, and whether it is set.
+// Password 如果设置了密码，则返回密码，以及是否设置了密码。
 func (u *Userinfo) Password() (string, bool) {
 	if u == nil {
 		return "", false
@@ -427,8 +395,7 @@ func (u *Userinfo) Password() (string, bool) {
 	return u.password, u.passwordSet
 }
 
-// String returns the encoded userinfo information in the standard form
-// of "username[:password]".
+// String 以标准格式“username[:password]”返回编码后的 userinfo 信息。
 func (u *Userinfo) String() string {
 	if u == nil {
 		return ""
@@ -440,9 +407,8 @@ func (u *Userinfo) String() string {
 	return s
 }
 
-// Maybe rawURL is of the form scheme:path.
-// (Scheme must be [a-zA-Z][a-zA-Z0-9+.-]*)
-// If so, return scheme, path; else return "", rawURL.
+// 也许 rawURL 的形式是scheme:path，(Scheme must be [a-zA-Z][a-zA-Z0-9+.-]*)
+// 如果是这样，返回 scheme, path; 否则返回 "", rawURL
 func getScheme(rawURL string) (scheme, path string, err error) {
 	for i := 0; i < len(rawURL); i++ {
 		c := rawURL[i]

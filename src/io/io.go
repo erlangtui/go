@@ -675,10 +675,8 @@ func (discard) ReadFrom(r Reader) (n int64, err error) {
 	}
 }
 
-// NopCloser returns a [ReadCloser] with a no-op Close method wrapping
-// the provided [Reader] r.
-// If r implements [WriterTo], the returned [ReadCloser] will implement [WriterTo]
-// by forwarding calls to r.
+// NopCloser 返回一个 [ReadCloser]，其中包含一个 no-op Close 方法，该方法包装了提供的 [Reader] r。
+// 如果 r 实现 [WriterTo]，则返回的 [ReadCloser] 将通过将调用转发到 r 来实现 [WriterTo]。
 func NopCloser(r Reader) ReadCloser {
 	if _, ok := r.(WriterTo); ok {
 		return nopCloserWriterTo{r}

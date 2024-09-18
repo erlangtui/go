@@ -326,10 +326,7 @@ func (c *Cookie) Valid() error {
 	return nil
 }
 
-// readCookies parses all "Cookie" values from the header h and
-// returns the successfully parsed Cookies.
-//
-// if filter isn't empty, only cookies of that name are returned.
+// readCookies 解析标头 h 中的所有 “Cookie” 值，并返回成功解析的 Cookie。如果 filter 不为空，则仅返回该名称的 Cookie。
 func readCookies(h Header, filter string) []*Cookie {
 	lines := h["Cookie"]
 	if len(lines) == 0 {
